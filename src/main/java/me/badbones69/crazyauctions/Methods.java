@@ -212,7 +212,11 @@ public class Methods {
 	}
 	
 	public static Player getPlayer(String name) {
-		return Bukkit.getServer().getPlayer(name);
+		try {
+			return Bukkit.getServer().getPlayer(name);
+		}catch(Exception e) {
+			return null;
+		}
 	}
 	
 	@SuppressWarnings("deprecation")
@@ -360,11 +364,13 @@ public class Methods {
 		Calendar cal = Calendar.getInstance();
 		Calendar expireTime = Calendar.getInstance();
 		Calendar fullExpireTime = Calendar.getInstance();
+		boolean shouldSave = false;
 		if(data.contains("OutOfTime/Cancelled")) {
 			for(String i : data.getConfigurationSection("OutOfTime/Cancelled").getKeys(false)) {
 				fullExpireTime.setTimeInMillis(data.getLong("OutOfTime/Cancelled." + i + ".Full-Time"));
 				if(cal.after(fullExpireTime)) {
 					data.set("OutOfTime/Cancelled." + i, null);
+					shouldSave = true;
 				}
 			}
 		}
@@ -386,12 +392,12 @@ public class Methods {
 						placeholders.put("%price%", getPrice(i, false));
 						placeholders.put("%Player%", winner);
 						placeholders.put("%player%", winner);
-						if(isOnline(winner)) {
+						if(isOnline(winner) && getPlayer(winner) != null) {
 							Player player = getPlayer(winner);
 							Bukkit.getPluginManager().callEvent(new AuctionWinBidEvent(player, data.getItemStack("Items." + i + ".Item"), price));
 							player.sendMessage(Messages.WIN_BIDDING.getMessage(placeholders));
 						}
-						if(isOnline(seller)) {
+						if(isOnline(seller) && getPlayer(seller) != null) {
 							Player player = getPlayer(seller);
 							player.sendMessage(Messages.SOMEONE_WON_PLAYERS_BID.getMessage(placeholders));
 						}
@@ -402,10 +408,10 @@ public class Methods {
 					}else {
 						String seller = data.getString("Items." + i + ".Seller");
 						Player player = getPlayer(seller);
-						if(isOnline(seller)) {
+						if(isOnline(seller) && getPlayer(seller) != null) {
 							player.sendMessage(Messages.ITEM_HAS_EXPIRED.getMessage());
 						}
-						AuctionExpireEvent event = new AuctionExpireEvent((player != null ? player : Bukkit.getOfflinePlayer(seller)), data.getItemStack("Items." + i + ".Item"));
+						AuctionExpireEvent event = new AuctionExpireEvent(player, data.getItemStack("Items." + i + ".Item"));
 						Bukkit.getPluginManager().callEvent(event);
 						data.set("OutOfTime/Cancelled." + num + ".Seller", data.getString("Items." + i + ".Seller"));
 						data.set("OutOfTime/Cancelled." + num + ".Full-Time", fullExpireTime.getTimeInMillis());
@@ -413,10 +419,11 @@ public class Methods {
 						data.set("OutOfTime/Cancelled." + num + ".Item", data.getItemStack("Items." + i + ".Item"));
 					}
 					data.set("Items." + i, null);
+					shouldSave = true;
 				}
 			}
 		}
-		Files.DATA.saveFile();
+		if(shouldSave) Files.DATA.saveFile();
 	}
 	
 	public static String getPrice(String ID, Boolean Expired) {
